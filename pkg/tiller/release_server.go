@@ -85,6 +85,7 @@ type ReleaseServer struct {
 	env       *environment.Environment
 	clientset internalclientset.Interface
 	Log       func(string, ...interface{})
+	MaxChunk  int
 }
 
 // NewReleaseServer creates a new release server.

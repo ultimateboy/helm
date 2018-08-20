@@ -18,11 +18,12 @@ package tiller
 
 import (
 	"fmt"
+	"regexp"
+
 	"github.com/golang/protobuf/proto"
 	"k8s.io/helm/pkg/proto/hapi/release"
 	"k8s.io/helm/pkg/proto/hapi/services"
 	relutil "k8s.io/helm/pkg/releaseutil"
-	"regexp"
 )
 
 // ListReleases lists the releases found by the server.
@@ -112,14 +113,28 @@ func (s *ReleaseServer) ListReleases(req *services.ListReleasesRequest, stream s
 		Count: l,
 		Total: total,
 	}
+
+	// if s.MaxChunk == 0 {
+	// 	res.Releases = rels
+	// 	if err := stream.Send(res); err != nil {
+	// 		return err
+	// 	}
+	// 	return nil
+	// }
+
 	chunks := s.partition(rels[:min(len(rels), int(req.Limit))], maxMsgSize-proto.Size(res))
+	var chunkNum int
 	for res.Releases = range chunks {
+		s.Log(fmt.Sprintf("sending chunk %d with %d releases", chunkNum, len(res.Releases)))
 		if err := stream.Send(res); err != nil {
 			for range chunks { // drain
 			}
+			s.Log(fmt.Sprintf("failed to send chunk %d: %s", chunkNum, err))
 			return err
 		}
+		chunkNum++
 	}
+	s.Log("done sending releases")
 	return nil
 }
 
